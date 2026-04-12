@@ -2,74 +2,51 @@ name: Build & Release APK
 
 on:
   push:
-    branches:
-      - master
-
-permissions:
-  contents: write
+    branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build Signed APK & Release
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
+      - run: chmod +x gradlew
+
       - name: Generate Keystore
         run: |
-          keytool -genkey -v \
-            -keystore $GITHUB_WORKSPACE/my-release-key.jks \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -alias mykey \
-            -storepass mypassword123 \
-            -keypass mypassword123 \
-            -dname "CN=Mohamed, OU=App, O=App, L=Cairo, S=Cairo, C=EG"
-          echo "✅ Keystore generated!"
+          keytool -genkeypair \
+            -alias wazakar \
+            -keyalg RSA -keysize 2048 \
+            -validity 9125 \
+            -keystore wazakar.jks \
+            -storepass wazakar123 \
+            -keypass wazakar123 \
+            -dname "CN=Wazakar,O=Islamic,C=EG" \
+            -noprompt
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
-
-      - name: Sign APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ env.KEYSTORE_B64 }}
-          alias: mykey
-          keyStorePassword: mypassword123
-          keyPassword: mypassword123
-
-      - name: Prepare keystore base64
+      - name: Build APK
         run: |
-          echo "KEYSTORE_B64=$(base64 -w 0 $GITHUB_WORKSPACE/my-release-key.jks)" >> $GITHUB_ENV
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/wazakar.jks \
+            -Pandroid.injected.signing.store.password=wazakar123 \
+            -Pandroid.injected.signing.key.alias=wazakar \
+            -Pandroid.injected.signing.key.password=wazakar123
 
-      - name: Get build version
-        id: version
-        run: |
-          echo "version=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Create Release with APK
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: "إصدار v${{ steps.version.outputs.version }}"
-          body: |
-            🚀 إصدار جديد تلقائي
-            📅 تاريخ البناء: ${{ steps.version.outputs.version }}
-            ✅ موقّع ومجهز للتثبيت
-          files: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          tag_name: "build-${{ github.run_number }}"
+          name: "وذكر - إصدار ${{ github.run_number }}"
+          files: app/build/outputs/apk/release/*.apk
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
