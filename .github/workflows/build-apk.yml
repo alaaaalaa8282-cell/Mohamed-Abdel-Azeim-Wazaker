@@ -1,79 +1,28 @@
-name: Build & Release APK
+name: Android CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 jobs:
   build:
-    name: Build Signed APK & Release
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v2
+    - name: set up JDK 17
+      uses: actions/setup-java@v2
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Generate Keystore if not exists
-        run: |
-          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "ðŸ”‘ Generating new keystore..."
-            keytool -genkey -v \
-              -keystore my-release-key.jks \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -alias mykey \
-              -storepass mypassword123 \
-              -keypass mypassword123 \
-              -dname "CN=Mohamed, OU=App, O=App, L=Cairo, S=Cairo, C=EG"
-
-            KEYSTORE_B64=$(base64 -w 0 my-release-key.jks)
-            gh secret set KEYSTORE_BASE64 --body "$KEYSTORE_B64"
-            echo "âœ… Keystore saved to secrets!"
-          else
-            echo "âœ… Using existing keystore"
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-release-key.jks
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
-
-      - name: Sign APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-          alias: mykey
-          keyStorePassword: mypassword123
-          keyPassword: mypassword123
-
-      - name: Get build version
-        id: version
-        run: |
-          echo "version=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: "Ø¥ØµØ¯Ø§Ø± v${{ steps.version.outputs.version }}"
-          body: |
-            ðŸš€ Ø¥ØµØ¯Ø§Ø± Ø¬Ø¯ÙŠØ¯ ØªÙ„Ù‚Ø§Ø¦ÙŠ
-            ðŸ“… ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ù†Ø§Ø¡: ${{ steps.version.outputs.version }}
-            âœ… Ù…ÙˆÙ‚Ù‘Ø¹ ÙˆÙ…Ø¬Ù‡Ø² Ù„Ù„ØªØ«Ø¨ÙŠØª
-          files: ${{ steps.sign_app.outputs.signedReleaseFile }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew build
+defaults:
+  
