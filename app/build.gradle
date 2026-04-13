@@ -61,7 +61,7 @@ dependencies {
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
 
     // qibla
-    
+    implementation 'com.github.hassaanjamil:hj-android-lib-qibla-direction:2.0.2'
 
     // Navigation component
     implementation("androidx.navigation:navigation-fragment-ktx:2.5.3")
